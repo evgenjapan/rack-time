@@ -2,7 +2,7 @@ require_relative 'time_format'
 
 class App
 
-  ALLOWED_URLS = ['/time'].freeze
+  DEFAULT_HEADERS = { 'Content-Type' => 'text/plain' }.freeze
 
   def call(env)
     @request = Rack::Request.new(env)
@@ -14,18 +14,21 @@ class App
   private
 
   def handle_request
-    return not_found unless url_allowed?
-
-    return bad_request('Bad request') if no_params?
-
-    perform_response
+    case @url
+    when '/time'
+      time_response
+    else
+      not_found
+    end
   end
 
-  def perform_response
+  def time_response
+    return bad_request("Bad request\n") if no_timeformat_params?
+
     time_format = DateTimeFormat.new(@request.params['format'])
 
     if time_format.valid_format?
-      ok(time_format.get_time.to_s + "\n")
+      ok("#{time_format.get_time.to_s}\n")
     else
       bad_request("Unknown time format #{time_format.errors}\n")
     end
@@ -43,20 +46,12 @@ class App
     response(400, error)
   end
 
-  def response(status, body)
-    [status, headers, [body]]
+  def response(status, body, headers = DEFAULT_HEADERS)
+    Rack::Response.new([body], status, headers)
   end
 
-  def headers
-    { 'Content-Type' => 'text/plain' }
-  end
-
-  def no_params?
-    @request.params['format'].nil? || @request.params['format'].empty?
-  end
-
-  def url_allowed?
-    ALLOWED_URLS.include? @url
+  def no_timeformat_params?
+    !@request.params.key?('format') || @request.params['format'].empty?
   end
 
 end
